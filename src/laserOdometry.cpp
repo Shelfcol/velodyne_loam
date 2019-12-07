@@ -280,7 +280,7 @@ void laserCloudSharpHandler(const sensor_msgs::PointCloud2ConstPtr& cornerPoints
   pcl::fromROSMsg(*cornerPointsSharp2, *cornerPointsSharp);
   std::vector<int> indices;
   pcl::removeNaNFromPointCloud(*cornerPointsSharp,*cornerPointsSharp, indices);
-  newCornerPointsSharp = true;
+  newCornerPointsSharp = true;//每次來一次數據就處理一次，處理完成之後就將newCornerPointsSharp置為false
 }
 
 void laserCloudLessSharpHandler(const sensor_msgs::PointCloud2ConstPtr& cornerPointsLessSharp2)
@@ -377,6 +377,9 @@ int main(int argc, char** argv)
   ros::Subscriber subImuTrans = nh.subscribe<sensor_msgs::PointCloud2> 
                                 ("/imu_trans", 5, imuTransHandler);
 
+
+
+
   ros::Publisher pubLaserCloudCornerLast = nh.advertise<sensor_msgs::PointCloud2>
                                            ("/laser_cloud_corner_last", 2);
 
@@ -387,6 +390,7 @@ int main(int argc, char** argv)
                                         ("/velodyne_cloud_3", 2);
 
   ros::Publisher pubLaserOdometry = nh.advertise<nav_msgs::Odometry> ("/laser_odom_to_init", 5);
+
   nav_msgs::Odometry laserOdometry;
   laserOdometry.header.frame_id = "/camera_init";
   laserOdometry.child_frame_id = "/laser_odom";
@@ -404,19 +408,23 @@ int main(int argc, char** argv)
   bool isDegenerate = false;
   cv::Mat matP(6, 6, CV_32F, cv::Scalar::all(0));
 
-  int frameCount = skipFrameNum;
+  int frameCount = skipFrameNum;//const skipFrameNum 1
   ros::Rate rate(100);
   bool status = ros::ok();
-  while (status) {
+  while (status) 
+  {
     ros::spinOnce();
-
+    //表示新收到了scanRegistration傳過來的數據
+    //0.005表示這次收到的數據必須與上一幀的數據時間間隔不超過5ms，否則時間過太久則不能進行特征匹配
     if (newCornerPointsSharp && newCornerPointsLessSharp && newSurfPointsFlat && 
         newSurfPointsLessFlat && newLaserCloudFullRes && newImuTrans &&
         fabs(timeCornerPointsSharp - timeSurfPointsLessFlat) < 0.005 &&
         fabs(timeCornerPointsLessSharp - timeSurfPointsLessFlat) < 0.005 &&
         fabs(timeSurfPointsFlat - timeSurfPointsLessFlat) < 0.005 &&
         fabs(timeLaserCloudFullRes - timeSurfPointsLessFlat) < 0.005 &&
-        fabs(timeImuTrans - timeSurfPointsLessFlat) < 0.005) {
+        fabs(timeImuTrans - timeSurfPointsLessFlat) < 0.005) 
+    {
+      //將if的判斷條件置false，表示後面這幀已經處理了
       newCornerPointsSharp = false;
       newCornerPointsLessSharp = false;
       newSurfPointsFlat = false;
@@ -424,7 +432,9 @@ int main(int argc, char** argv)
       newLaserCloudFullRes = false;
       newImuTrans = false;
 
-      if (!systemInited) {
+      //第一次數據過來時候的初始化，執行完這個if語句則會馬上跳到while循環初始位置，後面就不會再執行了
+      if (!systemInited) 
+      {
         pcl::PointCloud<PointType>::Ptr laserCloudTemp = cornerPointsLessSharp;
         cornerPointsLessSharp = laserCloudCornerLast;
         laserCloudCornerLast = laserCloudTemp;
@@ -462,7 +472,8 @@ int main(int argc, char** argv)
       transform[4] -= imuVeloFromStartY * scanPeriod;
       transform[5] -= imuVeloFromStartZ * scanPeriod;
 
-      if (laserCloudCornerLastNum > 10 && laserCloudSurfLastNum > 100) {
+      if (laserCloudCornerLastNum > 10 && laserCloudSurfLastNum > 100) 
+      {
         std::vector<int> indices;
         pcl::removeNaNFromPointCloud(*cornerPointsSharp,*cornerPointsSharp, indices);
         int cornerPointsSharpNum = cornerPointsSharp->points.size();
